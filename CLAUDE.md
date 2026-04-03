@@ -2,9 +2,10 @@
 
 Self-hosted performance + availability monitoring for all projects. Probes HTTP endpoints, GitHub Actions workflows, and local script logs. Sends alerts via Telegram + Resend email.
 
-**Location**: `C:\Users\user\watchtower`
+**Location**: `C:\Users\user\watchtower` (local)
 **GitHub**: https://github.com/tommytang2414/watchtower
 **Host**: AWS Lightsail VPS (`18.139.210.59`) — port 8080
+**VPS path**: `/home/ubuntu/watchtower/monitor/`
 **SSH**: `ubuntu` user with `LightsailDefaultKey-ap-southeast-1.pem`
 
 ---
@@ -152,7 +153,6 @@ Alert fires once per `probe_name + alert_type`. Subsequent failures are suppress
 | `winwin-api-rates` | http | https://winwinexchangehk.com/api/rates | 5 min |
 | `winwin-api-history` | http | https://winwinexchangehk.com/api/rates/history?days=7 | 5 min |
 | `winwin-autopost-gha` | github_actions | tommytang2414/exchange-website daily-rate-card.yml | 5 min |
-| `winwin-autopost-log` | log_parser | C:/Users/user/WinWinAutoPost/logs | 5 min |
 
 ---
 
@@ -173,29 +173,38 @@ After=network.target
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/watchtower
-ExecStart=/home/ubuntu/watchtower/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080
+WorkingDirectory=/home/ubuntu/watchtower/monitor
+ExecStart=/home/ubuntu/watchtower/monitor/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080
 Restart=always
 
 [Install]
 WantedBy=multi-user.target
 ```
-Save to `/etc/systemd/system/monitor.service`, then:
+Save to `/etc/systemd/system/watchtower.service`, then:
 ```bash
-sudo systemctl enable monitor
-sudo systemctl start monitor
-sudo journalctl -u monitor -f
+sudo systemctl enable watchtower
+sudo systemctl start watchtower
+sudo journalctl -u watchtower -f
 ```
 
 ---
 
 ## Changelog
 
+### 2026-04-04 — Watchtower goes live
+- Renamed from "Monitor Framework" to **Watchtower**
+- GitHub repo: https://github.com/tommytang2414/watchtower
+- VPS service deployed to: `/home/ubuntu/watchtower/monitor/`
+- Port 8080 opened on Lightsail firewall
+- Telegram bot configured: `Tommy's nanobot` (8363136217:AAEJk58sDggPZ1Ibr66pyFbwANkH-RtqlUQ)
+- GitHub PAT configured for `winwin-autopost-gha` probe
+- VPS service running at: http://18.139.210.59:8080/
+
 ### 2026-04-03 — Initial implementation
 - FastAPI monitoring service with SQLite storage
 - 3 HTTP probes (winwinexchangehk.com)
 - GitHub Actions poller (daily-rate-card workflow)
-- Log parser probe (WinWinAutoPost failure keywords)
+- Log parser probe (WinWinAutoPost failure keywords) — removed 2026-04-04 (GitHub Actions covers this)
 - Telegram + Resend alerting with 4-hour dedup
 - Dark-themed HTML dashboard
 - WinWinAutoPost retry decorator (3x, 30s backoff) + FINAL_STATUS line
