@@ -1,8 +1,9 @@
-# Monitor Framework — Project Documentation
+# Watchtower — Project Documentation
 
 Self-hosted performance + availability monitoring for all projects. Probes HTTP endpoints, GitHub Actions workflows, and local script logs. Sends alerts via Telegram + Resend email.
 
-**Location**: `C:\Users\user\monitor`
+**Location**: `C:\Users\user\watchtower`
+**GitHub**: https://github.com/tommytang2414/watchtower
 **Host**: AWS Lightsail VPS (`18.139.210.59`) — port 8080
 **SSH**: `ubuntu` user with `LightsailDefaultKey-ap-southeast-1.pem`
 
@@ -12,11 +13,11 @@ Self-hosted performance + availability monitoring for all projects. Probes HTTP 
 
 ```bash
 # Deploy to VPS
-pwsh C:\Users\user\monitor\deploy.ps1
+pwsh C:\Users\user\watchtower\deploy.ps1
 
 # Or SSH in and run manually
 ssh -i "C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem" ubuntu@18.139.210.59
-cd ~/monitor
+cd ~/watchtower
 source venv/bin/activate
 python -m uvicorn main:app --host 0.0.0.0 --port 8080
 ```
@@ -160,20 +161,20 @@ Alert fires once per `probe_name + alert_type`. Subsequent failures are suppress
 1. **SSH key**: `C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem`
 2. **Test SSH**: `ssh -i "C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem" ubuntu@18.139.210.59`
 3. **Python**: Python 3.10.12 already installed on VPS
-4. **Run deploy**: `pwsh C:\Users\user\monitor\deploy.ps1`
-5. **Set env vars** on VPS: edit `~/monitor/.env`
+4. **Run deploy**: `pwsh C:\Users\user\watchtower\deploy.ps1`
+5. **Set env vars** on VPS: edit `~/watchtower/.env`
 
 ### systemd service (optional)
 ```ini
 [Unit]
-Description=Monitor Framework
+Description=Watchtower
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
-WorkingDirectory=/home/ubuntu/monitor
-ExecStart=/home/ubuntu/monitor/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080
+WorkingDirectory=/home/ubuntu/watchtower
+ExecStart=/home/ubuntu/watchtower/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080
 Restart=always
 
 [Install]

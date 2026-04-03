@@ -198,7 +198,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="Monitor Framework", lifespan=lifespan)
+app = FastAPI(title="Watchtower", lifespan=lifespan)
 
 
 @app.get("/", response_class=HTMLResponse)

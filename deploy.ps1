@@ -1,17 +1,17 @@
-# Monitor Framework — Deploy to AWS Lightsail VPS
-# Run from: C:\Users\user\monitor>
+# Watchtower — Deploy to AWS Lightsail VPS
+# Run from: C:\Users\user\watchtower>
 # Requires: SSH access to VPS (see CLAUDE.md setup section)
 
 param(
     [string]$VpsHost = "18.139.210.59",
     [string]$VpsUser = "ubuntu",
     [string]$KeyPath = "C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem",
-    [string]$RemoteDir = "/home/ubuntu/monitor"
+    [string]$RemoteDir = "/home/ubuntu/watchtower"
 )
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "=== Monitor Framework Deploy ===" -ForegroundColor cyan
+Write-Host "=== Watchtower Deploy ===" -ForegroundColor cyan
 
 # 1. Check SSH connectivity
 Write-Host "[1/6] Testing SSH connectivity..." -ForegroundColor yellow
