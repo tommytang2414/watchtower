@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor</title>
+<style>
+  body { font-family: sans-serif; background: #111; color: #eee; margin: 0; padding: 20px; }
+  h1 { color: #ccc; font-size: 1.2rem; margin-bottom: 20px; }
+  .probes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .probe-card { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; }
+  .probe-card.up { border-color: #22c55e; }
+  .probe-card.down { border-color: #ef4444; }
+  .probe-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 6px; }
+  .probe-type { font-size: 0.75rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; }
+  .status { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.green { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+  .dot.red { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+  .meta { font-size: 0.8rem; color: #888; margin-top: 4px; }
+  .meta.error { color: #fca5a5; }
+  table { width: 100%; border-collapse: collapse; margin-top: 24px; font-size: 0.85rem; }
+  th { text-align: left; color: #888; border-bottom: 1px solid #333; padding: 6px 8px; }
+  td { padding: 6px 8px; border-bottom: 1px solid #222; }
+  tr.up td { color: #86efac; }
+  tr.down td { color: #fca5a5; }
+  .refresh { font-size: 0.8rem; color: #666; margin-bottom: 12px; }
+  .footer { margin-top: 32px; font-size: 0.75rem; color: #555; text-align: center; }
+</style>
+</head>
+<body>
+<h1>Monitor Framework</h1>
+<div class="refresh">Last refreshed: {{ now }} HKT</div>
+
+<div class="probes">
+{% for name, checks in checks.items() %}
+{% set last = checks[0] if checks else none %}
+<div class="probe-card {{ 'up' if last and last.up else 'down' }}">
+  <div class="probe-name">{{ name }}</div>
+  <div class="probe-type">{{ last.probe_type if last else 'no data' }}</div>
+  <div class="status">
+    <div class="dot {{ 'green' if last and last.up else 'red' }}"></div>
+    <span>{{ 'UP' if last and last.up else 'DOWN' if last else 'NO DATA' }}</span>
+  </div>
+  <div class="meta">
+    {% if last and last.response_time_ms %}{{ "%.0f"|format(last.response_time_ms) }}ms{% endif %}
+    {% if last and last.conclusion %}│ conclusion={{ last.conclusion }}{% endif %}
+    {% if last and last.stale %}│ STALE{% endif %}
+    {% if last and last.rates_count %}│ {{ last.rates_count }} rates{% endif %}
+  </div>
+  <div class="meta {{ 'error' if last and not last.up else '' }}">
+    {% if last and last.error_message %}{{ last.error_message }}{% endif %}
+    {% if last and last.matched_keywords %}{{ last.matched_keywords|join(', ') }}{% endif %}
+  </div>
+  <div class="meta">{{ last.created_at if last else '' }}</div>
+</div>
+{% endfor %}
+</div>
+
+<table>
+  <tr>
+    <th>Probe</th>
+    <th>Status</th>
+    <th>Response Time</th>
+    <th>Details</th>
+    <th>Time</th>
+  </tr>
+{% for name, checks in checks.items() %}
+{% for check in checks[:20] %}
+  <tr class="{{ 'up' if check.up else 'down' }}">
+    <td>{{ name }}</td>
+    <td>{{ 'UP' if check.up else 'DOWN' }}</td>
+    <td>{{ "%.0f"|format(check.response_time_ms) + 'ms' if check.response_time_ms else '-' }}</td>
+    <td>
+      {% if check.conclusion %}{{ check.conclusion }}{% endif %}
+      {% if check.stale %}STALE{% endif %}
+      {% if check.matched_keywords %}{{ check.matched_keywords|join(', ') }}{% endif %}
+      {% if check.error_message %}{{ check.error_message }}{% endif %}
+    </td>
+    <td>{{ check.created_at }}</td>
+  </tr>
+{% endfor %}
+{% endfor %}
+</table>
+
+<div class="footer">Monitor Framework — self-hosted on AWS Lightsail</div>
+</body>
+</html>
