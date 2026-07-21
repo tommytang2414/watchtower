@@ -22,4 +22,3 @@
 ## Next handoff
 
 - Review and rotate the exposed credentials, then replace plaintext values in documentation after explicit approval.
-
