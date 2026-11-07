@@ -31,7 +31,7 @@ async def send_alert(probe: dict, result: dict, alert_type: str):
     err_str = str(err) if err else ""
 
     msg = (
-        f"[{name}] 🔴 FAILED — {alert_type}\n"
+        f"[{name}] FAILED — {alert_type}\n"
         f"Target: {target}\n"
         f"Response: {rt_str}\n"
         f"Detail: {err_str}\n"
@@ -40,41 +40,47 @@ async def send_alert(probe: dict, result: dict, alert_type: str):
 
     logger.warning(f"ALERT: {msg}")
 
-    # Telegram
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-    if bot_token and chat_id:
-        try:
-            async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                    json={"chat_id": chat_id, "text": msg},
-                    timeout=10,
-                )
-            logger.info(f"Telegram alert sent for {name}")
-        except Exception as e:
-            logger.error(f"Telegram alert failed: {e}")
-
-    # Resend email (reuse existing key)
+    # Resend email — primary alert channel
     resend_key = os.getenv("RESEND_API_KEY", "")
     alert_email = os.getenv("ALERT_EMAIL", "")
+    email_ok = False
     if resend_key and alert_email:
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(
+                resp = await client.post(
                     "https://api.resend.com/emails",
                     json={
-                        "from": "Monitor <onboarding@resend.dev>",
+                        "from": "Watchtower <onboarding@resend.dev>",
                         "to": [alert_email],
-                        "subject": f"[{name}] 🔴 FAILED — {alert_type}",
+                        "subject": f"[{name}] FAILED — {alert_type} — {target}",
                         "text": msg,
                     },
                     headers={"Authorization": f"Bearer {resend_key}"},
-                    timeout=10,
+                    timeout=15,
                 )
-            logger.info(f"Resend alert sent for {name}")
+            if resp.status_code in (200, 201, 202):
+                logger.info(f"Email alert sent for {name}")
+                email_ok = True
+            else:
+                logger.error(f"Email alert failed: {resp.status_code} {resp.text}")
         except Exception as e:
-            logger.error(f"Resend alert failed: {e}")
+            logger.error(f"Email alert failed: {e}")
+
+    # Telegram — secondary (only if email failed)
+    if not email_ok:
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+        if bot_token and chat_id:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": chat_id, "text": msg},
+                        timeout=10,
+                    )
+                logger.info(f"Telegram fallback alert sent for {name}")
+            except Exception as e:
+                logger.error(f"Telegram fallback alert also failed: {e}")
 
 
 async def send_recovered(probe: dict, result: dict):
@@ -85,7 +91,7 @@ async def send_recovered(probe: dict, result: dict):
     rt_str = f"{rt_ms:.0f}ms" if rt_ms else "N/A"
 
     msg = (
-        f"[{name}] ✅ RECOVERED\n"
+        f"[{name}] RECOVERED\n"
         f"Target: {target}\n"
         f"Response: {rt_str}\n"
         f"Time: {_hkt_now()}"
@@ -93,15 +99,43 @@ async def send_recovered(probe: dict, result: dict):
 
     logger.info(f"RECOVERED: {msg}")
 
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
-    if bot_token and chat_id:
+    # Email — primary
+    resend_key = os.getenv("RESEND_API_KEY", "")
+    alert_email = os.getenv("ALERT_EMAIL", "")
+    email_ok = False
+    if resend_key and alert_email:
         try:
             async with httpx.AsyncClient() as client:
-                await client.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                    json={"chat_id": chat_id, "text": msg},
-                    timeout=10,
+                resp = await client.post(
+                    "https://api.resend.com/emails",
+                    json={
+                        "from": "Watchtower <onboarding@resend.dev>",
+                        "to": [alert_email],
+                        "subject": f"[{name}] RECOVERED — {target}",
+                        "text": msg,
+                    },
+                    headers={"Authorization": f"Bearer {resend_key}"},
+                    timeout=15,
                 )
+            if resp.status_code in (200, 201, 202):
+                logger.info(f"Recovery email sent for {name}")
+                email_ok = True
+            else:
+                logger.error(f"Recovery email failed: {resp.status_code}")
         except Exception as e:
-            logger.error(f"Telegram recovered message failed: {e}")
+            logger.error(f"Recovery email failed: {e}")
+
+    # Telegram — secondary fallback
+    if not email_ok:
+        bot_token = os.getenv("TELEGRAM_BOT_TOKEN", "")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+        if bot_token and chat_id:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": chat_id, "text": msg},
+                        timeout=10,
+                    )
+            except Exception as e:
+                logger.error(f"Telegram recovery fallback also failed: {e}")
