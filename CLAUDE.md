@@ -152,7 +152,6 @@ Alert fires once per `probe_name + alert_type`. Subsequent failures are suppress
 | `winwin-website` | http | https://winwinexchangehk.com/ | 5 min |
 | `winwin-api-rates` | http | https://winwinexchangehk.com/api/rates | 5 min |
 | `winwin-api-history` | http | https://winwinexchangehk.com/api/rates/history?days=7 | 5 min |
-| `winwin-autopost-gha` | github_actions | tommytang2414/exchange-website daily-rate-card.yml | 5 min |
 
 ### Output probes (audit-2 E01)
 
@@ -166,13 +165,16 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 | `watchtower-relay` | relay JSON | relay older than 2 h, or a source unreachable |
 | `short-alpha-lambda` | relay: CloudWatch | 0 candidates in all scans for 14 days, no scans, or price check unavailable in 4 days |
 | `devops-scanner` | relay: Task Scheduler | last result not 0 |
+| `winwin-autopost-gha` | relay: `gh` latest completed run | conclusion not success/skipped, or older than 50 h (runs Mon-Sat) |
 | `mac-smartflow-research`, `mac-asset-radar`, `mac-vulnpulse`, `mac-hk-civic-newsroom`, `mac-meme-agent` | relay: launchd | exit not 0, stdout log stale, asset-radar run or provider coverage incomplete. `mac-meme-agent` ends 2026-11-13 08:00 HKT |
 
 **Relay**: Windows scheduled task `WatchtowerRelay` runs `relay/relay.py` with `pythonw.exe` every 30 min. Read-only; it uploads raw facts to `~/watchtower/heartbeats/relay.json` on the VPS. Mac connection settings are `RELAY_*` keys in the untracked local `.env`. Last run log: `%LOCALAPPDATA%\watchtower-relay\last-run.log`. If the PC is off, one `watchtower-relay` alert fires and relay-fed probes skip.
 
+**AI diagnosis** (`relay/triage.py`): after each relay upload, up to 2 new alerts get a headless Claude Code run limited to `Read,Grep,Glob` in the job's project, with fixed read-only evidence. The Cantonese report is emailed to `RELAY_TRIAGE_EMAIL`. One run per alert occurrence (`%LOCALAPPDATA%\watchtower-relay\triaged.json`). `mac-asset-radar` is excluded because its logs may name employer assets. If the CLI is logged out, triage pauses and emails a reminder once a day; fix with `claude auth login`.
+
 **Gotchas**
 - `deploy.ps1` is stale: it uploads to `~/watchtower`, but the app runs from `~/watchtower/monitor`. Deploy with `scp` into `monitor/`.
-- Watchtower runs as systemd service `watchtower` (enabled, `Restart=always`). Restart with `sudo systemctl restart watchtower`; logs are in `journalctl -u watchtower`, not `/tmp/watchtower.log`.
+- Watchtower runs as systemd service `watchtower` (enabled, `Restart=on-failure`, `RestartSec=60`, 5 starts per 10 min, matching the Taker units). Restart with `sudo systemctl restart watchtower`; logs are in `journalctl -u watchtower`, not `/tmp/watchtower.log`.
 - Resend's test sender only delivers to the Resend account's own address, so `ALERT_EMAIL` must be that address until a domain is verified. `TELEGRAM_CHAT_ID` is empty, so there is no working fallback.
 - An alert is recorded in `sent_alerts` only after delivery; `ALERT NOT DELIVERED` in the log means it retries next run.
 
@@ -190,15 +192,20 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 ```ini
 [Unit]
 Description=Watchtower
-After=network.target
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/watchtower/monitor
 ExecStart=/home/ubuntu/watchtower/monitor/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080
-Restart=always
-RestartSec=5
+Restart=on-failure
+RestartSec=60
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
@@ -213,6 +220,12 @@ sudo journalctl -u watchtower -f
 ---
 
 ## Changelog
+
+### 2026-11-08 — GitHub probe via relay, AI diagnosis
+- `winwin-autopost-gha` now reads through the relay's `gh` login; the VPS token had been empty since about April. No new credential.
+- Added `relay/triage.py` and `/api/alerts/open`. Awaiting `claude auth login` on the PC before the first real diagnosis.
+- systemd unit restart settings aligned with the Taker units.
+- Production deploy: commit `444a2fb`.
 
 ### 2026-11-08 — Watchtower moved to systemd
 - Replaced the April `nohup` process with enabled service `watchtower`, so it starts on boot and restarts after a crash. Verified with `kill -9`; a full VPS reboot was not tested.

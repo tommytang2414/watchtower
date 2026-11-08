@@ -73,9 +73,24 @@ separate IAM approval).
   `Permission denied` since 2026-07-21 because `smartflow_vps.sh` is mode 664.
   Legacy collectors were disabled on purpose (SmartFlow P0-003), so this is not
   probed. The SmartFlow session should delete or fix that cron line.
-- `winwin-autopost-gha` has reported `GITHUB_TOKEN not configured` since about
-  2026-04-10 because the VPS `.env` value is empty. Its `alert_on` is `failure` only,
-  so it raises no alert. Restoring it needs a new read-only token (owner decision).
+
+## Later changes (2026-11-08)
+
+- **Service**: Watchtower runs as systemd unit `watchtower` (`Restart=on-failure`,
+  `RestartSec=60`, 5 starts per 10 min, journald, matching the Taker units). Same bind
+  address, port, working directory and `.env`. Crash restart was tested with `kill -9`;
+  a full VPS reboot was not.
+- **`winwin-autopost-gha`**: had reported `GITHUB_TOKEN not configured` since about
+  2026-04-10 and raised no alert. It now reads the latest run through the relay's
+  existing `gh` login: alerts on a failed run or one older than 50 h. No new credential.
+- **AI diagnosis** (`relay/triage.py`): each new alert gets one headless Claude Code run
+  limited to `Read,Grep,Glob` in the job's project, with no shell, network tools or
+  MCP, plus fixed read-only evidence collected by the relay. The report is emailed to
+  the owner. It changes nothing. `mac-asset-radar` is excluded because its logs may name
+  employer assets and the report leaves the machine by email; HTTP probes and the relay's
+  own alert are excluded because a code diagnosis would not help. Pending: the CLI on
+  the PC is logged out, so triage is paused, and the tool limit has not yet been tested
+  against a live run.
 
 ## Result of first deploy
 
