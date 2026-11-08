@@ -99,4 +99,4 @@ These are the fixes that will clear the alerts, each for that project's own sess
 | short-alpha | `short-alpha-lambda` | Package `yfinance` in the Lambda or replace the price lookup |
 | asset-radar | `mac-asset-radar` | Fix or retire the two degraded providers |
 | DevOps-Scanner | `devops-scanner` | Find why `run_daily_scan.bat` exits 2 |
-| HSI-ShortSell-git | prevents fake signals (A2-O2) | In `main()` right after `fetch_all()` (assuming the result is named `scraped`): `if sum(d.get("ss_ratio") is not None for d in scraped) < 47: sys.exit(2)` |
+| HSI-ShortSell-git | prevents fake signals (A2-O2) | In `main()` right after `scraped = fetch_all()`: `if sum(d.get("ss_ratio") is not None for d in scraped) < 47: raise SystemExit(2)` |
