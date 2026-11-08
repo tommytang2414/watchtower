@@ -154,6 +154,29 @@ Alert fires once per `probe_name + alert_type`. Subsequent failures are suppress
 | `winwin-api-history` | http | https://winwinexchangehk.com/api/rates/history?days=7 | 5 min |
 | `winwin-autopost-gha` | github_actions | tommytang2414/exchange-website daily-rate-card.yml | 5 min |
 
+### Output probes (audit-2 E01)
+
+Checks every 15 min that a job left the evidence of a good run. Rules: `probes/output_checks.py`; targets: `OUTPUT_PROBES` in `config.py`; design: `docs/output-checks.md`.
+
+| Probe | Evidence | Alerts when |
+|-------|----------|-------------|
+| `hsi-shortsell` | `hsi-monitor` lines in `/var/log/syslog{,.1}` | HK trading day: no run by 13:00/17:00 HKT, under 47 stocks, or close data date not today |
+| `taker-opt`, `taker-og`, `taker-sheet` | systemd journal | no `Running checks` / `logged` line in 2 h |
+| `smartflow-sec-form4`, `-form144`, `-congress-house`, `-sfc-short` | `~/SmartFlow-shadow/logs/*.log` | no successful JSON block in 2 h (SFC 26 h) |
+| `watchtower-relay` | relay JSON | relay older than 2 h, or a source unreachable |
+| `short-alpha-lambda` | relay: CloudWatch | 0 candidates in all scans for 14 days, no scans, or price check unavailable in 4 days |
+| `devops-scanner` | relay: Task Scheduler | last result not 0 |
+| `mac-smartflow-research`, `mac-asset-radar`, `mac-vulnpulse`, `mac-hk-civic-newsroom`, `mac-meme-agent` | relay: launchd | exit not 0, stdout log stale, asset-radar run or provider coverage incomplete. `mac-meme-agent` ends 2026-11-13 08:00 HKT |
+
+**Relay**: Windows scheduled task `WatchtowerRelay` runs `relay/relay.py` with `pythonw.exe` every 30 min. Read-only; it uploads raw facts to `~/watchtower/heartbeats/relay.json` on the VPS. Mac connection settings are `RELAY_*` keys in the untracked local `.env`. Last run log: `%LOCALAPPDATA%\watchtower-relay\last-run.log`. If the PC is off, one `watchtower-relay` alert fires and relay-fed probes skip.
+
+**Gotchas**
+- `deploy.ps1` is stale: it uploads to `~/watchtower`, but the app runs from `~/watchtower/monitor`. Deploy with `scp` into `monitor/`.
+- Restart by PID. `pkill -f "uvicorn main:app"` over SSH also kills the SSH command itself.
+- Watchtower runs under `nohup`, so a VPS reboot stops it. The systemd unit below is still not installed.
+- Resend's test sender only delivers to the Resend account's own address, so `ALERT_EMAIL` must be that address until a domain is verified. `TELEGRAM_CHAT_ID` is empty, so there is no working fallback.
+- An alert is recorded in `sent_alerts` only after delivery; `ALERT NOT DELIVERED` in the log means it retries next run.
+
 ---
 
 ## VPS Setup (First Time)
@@ -190,6 +213,12 @@ sudo journalctl -u watchtower -f
 ---
 
 ## Changelog
+
+### 2026-11-08 — Output checks and alert delivery (audit-2 E01)
+- Added 16 output probes for HSI, TakerLongShort, SmartFlow shadow, short-alpha, DevOps-Scanner and five Mac launchd jobs. See `docs/output-checks.md`.
+- Added the read-only Windows relay (`relay/relay.py`, task `WatchtowerRelay`). No new port, key or IAM change.
+- Found that no alert had ever been delivered: Resend returned 403 for `ALERT_EMAIL`, and Telegram had no chat ID. Changed VPS `ALERT_EMAIL` to the Resend account address; alerts are now recorded only after delivery.
+- Production deploy: commits `66b525e`, `0975ae1`. First delivered alerts: `short-alpha-lambda`, `mac-smartflow-research`, `mac-asset-radar`, `devops-scanner`.
 
 ### 2026-04-04 — Watchtower goes live
 - Renamed from "Monitor Framework" to **Watchtower**

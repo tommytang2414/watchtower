@@ -2,23 +2,30 @@
 
 ## Current state
 
-- Branch / commit: `main` / `25fdf1a`
-- Last agent: Codex
-- Updated: 2026-07-22 HKT
+- Branch / commit: `main`; production code at `0975ae1`. Docs commit follows it.
+- Last agent: Claude
+- Updated: 2026-11-08 HKT
 
 ## Completed
 
-- Added Git ignore protection for local `.env` variants while retaining example templates.
+- Audit-2 E01: 16 output probes deployed. Design: `docs/output-checks.md`.
+- Windows task `WatchtowerRelay` (every 30 min) supplies Mac, Lambda and Windows facts.
+- Alert delivery repaired. No alert had ever been delivered before this work.
 
 ## Verification
 
-- `git check-ignore` confirms `.env` is ignored and `.env.example` remains trackable.
+- Rule tests on real logs passed; VPS integration test confirmed alert, dedup and recovery.
+- Deployed; VPS, local and HEAD code hashes match. Resend accepted four real alerts.
 
 ## Decisions / constraints
 
-- Pre-existing uncommitted changes in `CLAUDE.md` and `alerter.py` were preserved and not staged.
-- Plaintext credential values remain in tracked project documentation; removal and credential rotation require explicit security-change approval.
+- The uncommitted `CLAUDE.md` hunk contains a Resend key. It predates this work, is preserved in the working tree and must not be committed.
+- The repo is public: no LAN address, employer asset name or secret. Mac settings stay in `RELAY_*` keys in local `.env`.
+- SmartFlow legacy cron is deliberately not probed.
+- The relay uses the `claude-agent` AWS profile (AdministratorAccess) read-only; the owner accepted this.
 
 ## Next handoff
 
-- Review and rotate the exposed credentials, then replace plaintext values in documentation after explicit approval.
+- Owner: confirm the four alert emails arrived.
+- Watchtower follow-ups: install the systemd unit, fix `deploy.ps1`, set a Telegram chat ID, rotate exposed credentials (R01).
+- Other projects' fixes are listed in `docs/output-checks.md` under Follow-ups.

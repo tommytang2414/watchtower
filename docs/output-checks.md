@@ -1,6 +1,6 @@
 # Output checks (audit-2 E01) — design note
 
-Status: draft for owner approval, 2026-11-08.
+Status: approved by the owner and deployed, 2026-11-08 (commits `66b525e`, `0975ae1`).
 
 ## Problem
 
@@ -76,8 +76,27 @@ separate IAM approval).
 - Process restart: Watchtower runs under `nohup`, not systemd. A VPS reboot stops
   monitoring silently. Installing the documented systemd unit is a separate follow-up.
 
-## Expected alerts on first deploy
+## Result of first deploy
 
-These are the known silent failures and prove the checks work:
-smartflow-research (exit 1), asset-radar (tools ok < ran), short-alpha
-(0 candidates / price check unavailable), DevOps-Scanner (exit 2).
+Four probes fired on the known silent failures, and Resend accepted all four emails:
+`mac-smartflow-research` (exit 1), `mac-asset-radar` (providers 19/21),
+`short-alpha-lambda` (0 candidates in 170 scans, price check unavailable),
+`devops-scanner` (exit 2).
+
+Deploying also showed that no alert had ever been delivered: Resend's test sender
+rejected `ALERT_EMAIL` with 403, and `TELEGRAM_CHAT_ID` was empty. `ALERT_EMAIL` now
+holds the Resend account's address, and an alert is recorded only after delivery.
+
+## Follow-ups for other projects
+
+No job needs a heartbeat line; every check reads output the job already writes.
+These are the fixes that will clear the alerts, each for that project's own session:
+
+| Project | Alert it clears | Change |
+|---|---|---|
+| SmartFlow | `mac-smartflow-research` | Find why the research job has exited 1 since 2026-11-06 |
+| SmartFlow | none (legacy cron) | Remove the dead line: `crontab -l \| grep -v 'smartflow_vps.sh' \| crontab -`, or run it as `bash ~/SmartFlow/smartflow_vps.sh` if the daily restart is still wanted |
+| short-alpha | `short-alpha-lambda` | Package `yfinance` in the Lambda or replace the price lookup |
+| asset-radar | `mac-asset-radar` | Fix or retire the two degraded providers |
+| DevOps-Scanner | `devops-scanner` | Find why `run_daily_scan.bat` exits 2 |
+| HSI-ShortSell-git | prevents fake signals (A2-O2) | In `main()` right after `fetch_all()` (assuming the result is named `scraped`): `if sum(d.get("ss_ratio") is not None for d in scraped) < 47: sys.exit(2)` |
