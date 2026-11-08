@@ -88,9 +88,9 @@ separate IAM approval).
   MCP, plus fixed read-only evidence collected by the relay. The report is emailed to
   the owner. It changes nothing. `mac-asset-radar` is excluded because its logs may name
   employer assets and the report leaves the machine by email; HTTP probes and the relay's
-  own alert are excluded because a code diagnosis would not help. Pending: the CLI on
-  the PC is logged out, so triage is paused, and the tool limit has not yet been tested
-  against a live run.
+  own alert are excluded because a code diagnosis would not help. Canary tests confirmed
+  that writes, shell, web, `.env` and files outside the project are refused. The first
+  three real diagnoses ran through the scheduled task and reached the inbox.
 
 ## Result of first deploy
 

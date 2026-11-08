@@ -122,9 +122,11 @@ def diagnose(alert: dict, job: dict, evidence: str) -> str:
     prompt = PROMPT.format(probe=alert["probe_name"], detail=alert.get("detail") or alert["alert_type"],
                            sent_at=alert["sent_at"], evidence=evidence)
     cwd = HOME / job["project"]
-    args = [str(CLAUDE_EXE), "-p", "--model", MODEL, "--tools", "Read,Grep,Glob",
-            "--permission-mode", "dontAsk", "--allowedTools", "Read,Grep,Glob",
-            "--disallowedTools", "Read(**/.env*),Read(**/*.pem),Read(**/.ssh/**),Read(**/.aws/**)",
+    # --setting-sources "" is what confines reads to the project: the user-level allow list
+    # otherwise lets Read reach any path. Do not add --allowedTools Read; it has the same effect.
+    args = [str(CLAUDE_EXE), "-p", "--model", MODEL, "--setting-sources", "", "--tools", "Read,Grep,Glob",
+            "--permission-mode", "dontAsk",
+            "--disallowedTools", "Read(**/.env*),Grep(**/.env*),Read(**/*.pem),Read(**/.ssh/**),Read(**/.aws/**)",
             "--strict-mcp-config", "--no-session-persistence", "--max-budget-usd", "1"]
     return run(args, stdin=prompt, timeout=AGENT_TIMEOUT_S, cwd=str(cwd)).strip()
 
