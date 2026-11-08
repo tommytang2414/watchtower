@@ -170,7 +170,7 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 
 **Relay**: Windows scheduled task `WatchtowerRelay` runs `relay/relay.py` with `pythonw.exe` every 30 min. Read-only; it uploads raw facts to `~/watchtower/heartbeats/relay.json` on the VPS. Mac connection settings are `RELAY_*` keys in the untracked local `.env`. Last run log: `%LOCALAPPDATA%\watchtower-relay\last-run.log`. If the PC is off, one `watchtower-relay` alert fires and relay-fed probes skip.
 
-**AI diagnosis** (`relay/triage.py`): after each relay upload, up to 2 new alerts get a headless Claude Code run limited to `Read,Grep,Glob` in the job's project, with fixed read-only evidence. The Cantonese report is emailed to `RELAY_TRIAGE_EMAIL`. One run per alert occurrence (`%LOCALAPPDATA%\watchtower-relay\triaged.json`). `mac-asset-radar` is excluded because its logs may name employer assets. If the CLI is logged out, triage pauses and emails a reminder once a day; fix with `claude auth login`.
+**AI diagnosis** (`relay/triage.py`): after each relay upload, up to 2 new alerts get a headless Claude Code run limited to `Read,Grep,Glob` in the job's project, with fixed read-only evidence. The Cantonese report is emailed to `RELAY_TRIAGE_EMAIL`. One run per alert occurrence (`%LOCALAPPDATA%\watchtower-relay\triaged.json`). `mac-asset-radar` is excluded because its logs may name employer assets. If the CLI is logged out, triage pauses and emails a reminder once a day; fix with `claude auth login`. Keep the empty `--setting-sources` in `triage.py`: without it the user-level allow list lets the agent read any path.
 
 **Gotchas**
 - `deploy.ps1` is stale: it uploads to `~/watchtower`, but the app runs from `~/watchtower/monitor`. Deploy with `scp` into `monitor/`.
@@ -223,7 +223,8 @@ sudo journalctl -u watchtower -f
 
 ### 2026-11-08 — GitHub probe via relay, AI diagnosis
 - `winwin-autopost-gha` now reads through the relay's `gh` login; the VPS token had been empty since about April. No new credential.
-- Added `relay/triage.py` and `/api/alerts/open`. Awaiting `claude auth login` on the PC before the first real diagnosis.
+- Added `relay/triage.py` and `/api/alerts/open`. First real diagnoses ran through the scheduled task and reached the inbox.
+- Tested the agent limits with canaries. Writes, shell, web, `.env` and files outside the project are refused.
 - systemd unit restart settings aligned with the Taker units.
 - Production deploy: commit `444a2fb`.
 
