@@ -144,9 +144,12 @@ async def check_and_alert(probe: dict):
         # Check dedup cooldown
         unresolved = await get_unresolved_alert(name, alert_type)
         if not unresolved:
-            await upsert_alert(name, alert_type)
-            await send_alert(probe, result, alert_type)
-            logger.warning(f"ALERT fired: {name} [{alert_type}]")
+            # Mark as sent only once delivered, so a failed send retries next run.
+            if await send_alert(probe, result, alert_type):
+                await upsert_alert(name, alert_type)
+                logger.warning(f"ALERT fired: {name} [{alert_type}]")
+            else:
+                logger.error(f"ALERT NOT DELIVERED, will retry: {name} [{alert_type}]")
         else:
             logger.info(f"Alert suppressed (dedup): {name} [{alert_type}]")
     else:

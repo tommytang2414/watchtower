@@ -15,12 +15,8 @@ def _hkt_now() -> str:
     return datetime.now(timezone(timedelta(hours=8))).strftime("%Y-%m-%d %H:%M HKT")
 
 
-async def send_alert(probe: dict, result: dict, alert_type: str):
-    """
-    Send an alert notification.
-    Phase 2: real Telegram + Resend sends.
-    Phase 1: log only.
-    """
+async def send_alert(probe: dict, result: dict, alert_type: str) -> bool:
+    """Send an alert by email, falling back to Telegram. Returns True only if one channel delivered."""
     target = probe.get("target") or probe.get("log_path") or f"{probe['owner']}/{probe['repo']}"
     name = probe["name"]
     ptype = probe["type"]
@@ -73,14 +69,20 @@ async def send_alert(probe: dict, result: dict, alert_type: str):
         if bot_token and chat_id:
             try:
                 async with httpx.AsyncClient() as client:
-                    await client.post(
+                    resp = await client.post(
                         f"https://api.telegram.org/bot{bot_token}/sendMessage",
                         json={"chat_id": chat_id, "text": msg},
                         timeout=10,
                     )
-                logger.info(f"Telegram fallback alert sent for {name}")
+                if resp.status_code == 200:
+                    logger.info(f"Telegram fallback alert sent for {name}")
+                    return True
+                logger.error(f"Telegram fallback alert failed: {resp.status_code}")
             except Exception as e:
                 logger.error(f"Telegram fallback alert also failed: {e}")
+        else:
+            logger.error("Telegram fallback not configured (TELEGRAM_BOT_TOKEN/TELEGRAM_CHAT_ID)")
+    return email_ok
 
 
 async def send_recovered(probe: dict, result: dict):
