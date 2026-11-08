@@ -222,6 +222,12 @@ sudo journalctl -u watchtower -f
 
 ## Changelog
 
+### 2026-11-08 — Output-check tests and alert-once fixes (audit-2 E01)
+- Added `tests/test_output_checks.py`. A SmartFlow log failing at restart and a Windows task sampled while running now skip; both had caused a false `RECOVERED` and a repeat alert.
+- `devops-scanner` alerts if its last run is older than 14 days.
+- Verified on production by making `relay.json` 3 h stale: one alert at 16:32 HKT, dedup at 16:47, `RECOVERED` at 17:02 after the next real upload. No other probe alerted.
+- Production deploy: commit `d83f2b4`. Backup: `~/watchtower/backups/e01-20261108T080223Z`.
+
 ### 2026-11-08 — GitHub probe via relay, AI diagnosis
 - `winwin-autopost-gha` now reads through the relay's `gh` login; the VPS token had been empty since about April. No new credential.
 - Added `relay/triage.py` and `/api/alerts/open`. First real diagnoses ran through the scheduled task and reached the inbox.

@@ -2,7 +2,7 @@
 
 ## Current state
 
-- Branch / commit: `main`; production code at `444a2fb`.
+- Branch / commit: `claude/e01-output-heartbeats-6f8fac`, based on `main` at `b5c8286`; production code at `d83f2b4` (not on `main` until this branch is merged).
 - Last agent: Claude
 - Updated: 2026-11-08 HKT
 
@@ -17,7 +17,8 @@
 
 ## Verification
 
-- Rule tests on real logs passed; VPS integration test confirmed alert, dedup and recovery.
+- `python -m unittest discover -s tests`: 20 pass on Windows Python 3.12 and the VPS venv (3.10).
+- Synthetic stale `relay.json` on production: one alert 16:32 HKT, dedup 16:47, `RECOVERED` 17:02. No other probe alerted; the four known-bad alerts were not re-sent; Win Win probes up.
 - systemd: enabled, active, one uvicorn, new rows for all 20 probes, no alerts re-sent. Crash restart tested with `kill -9`; a full reboot was not.
 - Triage: canary tests refused writes, shell, web, `.env` and out-of-project reads. Three real diagnoses reached the inbox, and a later run did not repeat them. The logged-out path pauses and emails a reminder.
 
@@ -29,5 +30,8 @@
 
 ## Next handoff
 
+- Merge this branch to `main`. The main checkout has an uncommitted `CLAUDE.md` from another session, so preserve it when updating that checkout.
+- After the 2026-11-14 reboot, confirm the service is active and no alert was re-sent; a full reboot is still untested.
+- Key counts for five jobs need writer changes in their own projects: see "Key counts not yet covered" in `docs/output-checks.md`.
 - AI diagnosis claims are unverified; each owning project's session should confirm before fixing.
 - Follow-ups: fix `deploy.ps1`, set a Telegram chat ID, rotate exposed credentials (R01).
