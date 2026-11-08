@@ -33,17 +33,8 @@ HTTP_PROBES = [
 
 # ─── GitHub Actions Probes ─────────────────────────────────────────────────────
 
-GITHUB_PROBES = [
-    {
-        "name": "winwin-autopost-gha",
-        "type": "github_actions",
-        "owner": "tommytang2414",
-        "repo": "exchange-website",
-        "workflow_filename": "daily-rate-card.yml",
-        "interval_minutes": 5,
-        "alert_on": ["failure"],
-    },
-]
+# Empty: the VPS has no GitHub token. winwin-autopost-gha reads through the relay below.
+GITHUB_PROBES = []
 
 # ─── Output probes (audit-2 E01) ───────────────────────────────────────────────
 # "The job ran but produced nothing useful." Rules live in probes/output_checks.py.
@@ -82,6 +73,8 @@ OUTPUT_PROBES = [
     _output("watchtower-relay", "relay_heartbeat", "Windows WatchtowerRelay task"),
     _output("short-alpha-lambda", "relay_lambda", "Lambda short-alpha-agent"),
     _output("devops-scanner", "relay_win_task", "Windows task DevOpsScanner", task_name="DevOpsScanner"),
+    # Runs twice a day Mon-Sat; 50 h spans Sunday.
+    _output("winwin-autopost-gha", "relay_gha", "GitHub Actions exchange-website daily-rate-card.yml", max_age_hours=50),
     _launchd("mac-smartflow-research", "com.smartflow.research.daily", 26),
     _launchd("mac-asset-radar", "com.asset-radar.daily", 26, asset_radar=True),
     _launchd("mac-vulnpulse", "com.vulnpulse.scan", 7),

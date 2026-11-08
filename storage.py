@@ -144,6 +144,23 @@ async def get_recent_checks_all(hours: int = 24, limit_per_probe: int = 10) -> d
     return result
 
 
+async def get_open_alerts() -> list[dict]:
+    """Unresolved alerts with the latest check's error text as detail."""
+    async with aiosqlite.connect(DATABASE_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """
+            SELECT a.probe_name, a.alert_type, a.sent_at,
+                   (SELECT c.error_message FROM checks c WHERE c.probe_name = a.probe_name
+                    ORDER BY c.id DESC LIMIT 1) AS detail
+            FROM sent_alerts a
+            WHERE a.resolved_at IS NULL
+            ORDER BY a.sent_at
+            """
+        )
+        return [dict(row) for row in await cursor.fetchall()]
+
+
 async def get_unresolved_alert(probe_name: str, alert_type: str) -> Optional[dict]:
     """Check if there's an unresolved alert."""
     async with aiosqlite.connect(DATABASE_PATH) as db:

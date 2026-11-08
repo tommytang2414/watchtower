@@ -20,6 +20,7 @@ import shutil
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +36,10 @@ MAC_LABELS = [
 ]
 WINDOWS_TASKS = ["DevOpsScanner"]
 LAMBDA_LOG_GROUP = "/aws/lambda/short-alpha-agent"
+# probe name -> (repo, workflow file, branch). Read through the existing `gh` login.
+GITHUB_WORKFLOWS = {
+    "winwin-autopost-gha": ("tommytang2414/exchange-website", "daily-rate-card.yml", "master"),
+}
 
 # Runs on the Mac via `python3 -`. Prints one JSON object of aggregate facts only.
 MAC_SCRIPT = r'''
@@ -86,17 +91,17 @@ def load_settings() -> dict:
     env = ROOT / ".env"
     if env.exists():
         for line in env.read_text(encoding="utf-8").splitlines():
-            if line.startswith("RELAY_") and "=" in line:
+            if line.startswith(("RELAY_", "RESEND_API_KEY=")) and "=" in line:
                 k, v = line.split("=", 1)
                 settings[k.strip()] = v.strip()
     settings.update({k: v for k, v in os.environ.items() if k.startswith("RELAY_")})
     return settings
 
 
-def run(cmd: list[str], stdin: str | None = None, timeout: int = 60) -> str:
+def run(cmd: list[str], stdin: str | None = None, timeout: int = 60, cwd: str | None = None) -> str:
     exe = shutil.which(cmd[0]) or cmd[0]
     p = subprocess.run(
-        [exe, *cmd[1:]], input=stdin, capture_output=True, text=True,
+        [exe, *cmd[1:]], input=stdin, capture_output=True, text=True, cwd=cwd,
         encoding="utf-8", errors="replace", timeout=timeout, creationflags=NO_WINDOW,
     )
     if p.returncode != 0:
@@ -104,7 +109,7 @@ def run(cmd: list[str], stdin: str | None = None, timeout: int = 60) -> str:
     return p.stdout
 
 
-def collect_mac(s: dict) -> dict:
+def mac_ssh(s: dict) -> list[str]:
     target = s.get("RELAY_MAC_SSH_TARGET")
     if not target:
         raise RuntimeError("RELAY_MAC_SSH_TARGET not set")
@@ -114,7 +119,11 @@ def collect_mac(s: dict) -> dict:
         cmd += ["-o", f"UserKnownHostsFile={s['RELAY_MAC_KNOWN_HOSTS']}"]
     if s.get("RELAY_MAC_SSH_KEY"):
         cmd += ["-i", s["RELAY_MAC_SSH_KEY"]]
-    out = run(cmd + [target, "python3 -"], stdin=MAC_SCRIPT, timeout=60)
+    return cmd + [target]
+
+
+def collect_mac(s: dict) -> dict:
+    out = run(mac_ssh(s) + ["python3 -"], stdin=MAC_SCRIPT, timeout=60)
     return {"ok": True, **json.loads(out)}
 
 
@@ -151,6 +160,19 @@ def collect_windows() -> dict:
     return {"ok": True, "tasks": {k: v for k, v in tasks.items() if v is not None}}
 
 
+def collect_github() -> dict:
+    runs = {}
+    for name, (repo, workflow, branch) in GITHUB_WORKFLOWS.items():
+        out = run(["gh", "run", "list", "--repo", repo, "--workflow", workflow, "--branch", branch,
+                   "--status", "completed", "--limit", "1", "--json", "conclusion,createdAt"], timeout=60)
+        latest = (json.loads(out or "[]") or [None])[0]
+        runs[name] = latest and {
+            "conclusion": latest["conclusion"],
+            "created_at": datetime.fromisoformat(latest["createdAt"]).timestamp(),
+        }
+    return {"ok": True, "runs": runs}
+
+
 def section(fn, *args) -> dict:
     try:
         return fn(*args)
@@ -166,6 +188,7 @@ def main() -> int:
         "mac": section(collect_mac, s),
         "aws": section(collect_aws, s),
         "windows": section(collect_windows),
+        "github": section(collect_github),
     }
     payload = json.dumps(report, indent=1)
     if "--print" in sys.argv:
@@ -180,8 +203,20 @@ def main() -> int:
         status = "uploaded"
     except Exception as e:
         status = f"upload failed: {e}"
-    LOG_FILE.write_text(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {status}\n{payload}\n", encoding="utf-8")
+    triage_log = run_triage(s) if "--no-triage" not in sys.argv else []
+    LOG_FILE.write_text(
+        f"{time.strftime('%Y-%m-%d %H:%M:%S')} {status}\ntriage: {triage_log}\n{payload}\n", encoding="utf-8"
+    )
     return 0 if status == "uploaded" else 1
+
+
+def run_triage(s: dict) -> list[str]:
+    # Lazy import: triage.py imports helpers from this module. A triage problem never fails the relay.
+    try:
+        import triage
+        return triage.triage_new_alerts(s)
+    except Exception as e:
+        return [f"triage error: {str(e)[:200]}"]
 
 
 if __name__ == "__main__":

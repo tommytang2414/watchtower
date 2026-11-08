@@ -24,6 +24,7 @@ from storage import (
     record_check,
     get_last_check,
     get_recent_checks_all,
+    get_open_alerts,
     get_unresolved_alert,
     upsert_alert,
     resolve_alert,
@@ -227,6 +228,12 @@ async def dashboard():
 async def health():
     """Self health check."""
     return {"status": "ok", "time": datetime.now(timezone(timedelta(hours=8))).isoformat()}
+
+
+@app.get("/api/alerts/open")
+async def api_open_alerts():
+    """Unresolved alerts; read by the relay's AI triage."""
+    return await get_open_alerts()
 
 
 @app.get("/api/checks")

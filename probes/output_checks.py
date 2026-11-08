@@ -203,7 +203,7 @@ def evaluate_relay_heartbeat(data: dict | None, problem: str | None) -> dict:
         return _bad([f"{problem} (Windows PC off or WatchtowerRelay task failing)"])
     reasons = [
         f"{section} unreachable: {data[section].get('error')}"
-        for section in ("mac", "aws", "windows")
+        for section in ("mac", "aws", "windows", "github")
         if not data.get(section, {}).get("ok")
     ]
     return _bad(reasons) if reasons else _ok()
@@ -291,6 +291,22 @@ def evaluate_relay_win_task(probe: dict, data: dict | None, problem: str | None)
     return _ok()
 
 
+def evaluate_relay_gha(probe: dict, data: dict | None, problem: str | None, now: float) -> dict:
+    gh, skip = _relay_section(data, problem, "github")
+    if skip:
+        return skip
+    run = gh.get("runs", {}).get(probe["name"])
+    if not run:
+        return _bad(["no completed workflow run found"])
+    reasons = []
+    if run.get("conclusion") not in ("success", "skipped"):
+        reasons.append(f"latest run conclusion {run.get('conclusion')}")
+    age = _age_h(run.get("created_at"), now)
+    if age > probe["max_age_hours"]:
+        reasons.append(f"latest run {age:.1f} h old (> {probe['max_age_hours']:g} h)")
+    return _bad(reasons) if reasons else _ok()
+
+
 def check_relay(probe: dict) -> dict:
     data, problem = load_relay()
     kind = probe["check"]
@@ -302,6 +318,8 @@ def check_relay(probe: dict) -> dict:
         return evaluate_relay_lambda(data, problem)
     if kind == "relay_win_task":
         return evaluate_relay_win_task(probe, data, problem)
+    if kind == "relay_gha":
+        return evaluate_relay_gha(probe, data, problem, time.time())
     raise ValueError(f"unknown relay check {kind}")
 
 
