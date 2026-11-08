@@ -29,7 +29,7 @@ from storage import (
     resolve_alert,
 )
 from alerter import send_alert, send_recovered
-from probes import run_http_probe, run_github_actions_probe, run_log_parser_probe
+from probes import run_http_probe, run_github_actions_probe, run_log_parser_probe, run_output_probe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,6 +43,9 @@ def should_alert(probe: dict, check_result: dict) -> Optional[str]:
     """Return alert type string if alert should fire, else None."""
     up = check_result.get("up", False)
     alert_on = probe.get("alert_on", [])
+
+    if probe["type"] == "output":
+        return "bad_output" if not up and "bad_output" in alert_on else None
 
     if not up:
         if "down" in alert_on:
@@ -92,6 +95,8 @@ async def run_probe(probe: dict) -> dict:
             repo=probe["repo"],
             workflow_filename=probe["workflow_filename"],
         )
+    elif ptype == "output":
+        return await run_output_probe(probe)
     elif ptype == "log_parser":
         return await run_log_parser_probe(
             log_path=probe["log_path"],
@@ -111,6 +116,11 @@ async def check_and_alert(probe: dict):
     except Exception as e:
         logger.error(f"Probe {name} raised exception: {e}")
         result = {"up": False, "error_message": str(e)}
+
+    # Output checks that cannot judge right now neither alert nor resolve.
+    if result.get("skip"):
+        logger.info(f"Probe {name} skipped: {result.get('error_message')}")
+        return
 
     # Record to SQLite
     await record_check(
@@ -145,7 +155,7 @@ async def check_and_alert(probe: dict):
         was_failure = await get_unresolved_alert(name, "failure")
         was_keyword = await get_unresolved_alert(name, "keyword_found")
 
-        for alert_type_resolve in ["down", "failure", "keyword_found", "stale", "slow_5s", "slow_10s", "content_missing"]:
+        for alert_type_resolve in ["down", "failure", "keyword_found", "stale", "slow_5s", "slow_10s", "content_missing", "bad_output"]:
             resolved = await resolve_alert(name, alert_type_resolve)
             if resolved:
                 await send_recovered(probe, result)
