@@ -73,8 +73,9 @@ separate IAM approval).
   `Permission denied` since 2026-07-21 because `smartflow_vps.sh` is mode 664.
   Legacy collectors were disabled on purpose (SmartFlow P0-003), so this is not
   probed. The SmartFlow session should delete or fix that cron line.
-- Process restart: Watchtower runs under `nohup`, not systemd. A VPS reboot stops
-  monitoring silently. Installing the documented systemd unit is a separate follow-up.
+- `winwin-autopost-gha` has reported `GITHUB_TOKEN not configured` since about
+  2026-04-10 because the VPS `.env` value is empty. Its `alert_on` is `failure` only,
+  so it raises no alert. Restoring it needs a new read-only token (owner decision).
 
 ## Result of first deploy
 

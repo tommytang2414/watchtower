@@ -172,8 +172,7 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 
 **Gotchas**
 - `deploy.ps1` is stale: it uploads to `~/watchtower`, but the app runs from `~/watchtower/monitor`. Deploy with `scp` into `monitor/`.
-- Restart by PID. `pkill -f "uvicorn main:app"` over SSH also kills the SSH command itself.
-- Watchtower runs under `nohup`, so a VPS reboot stops it. The systemd unit below is still not installed.
+- Watchtower runs as systemd service `watchtower` (enabled, `Restart=always`). Restart with `sudo systemctl restart watchtower`; logs are in `journalctl -u watchtower`, not `/tmp/watchtower.log`.
 - Resend's test sender only delivers to the Resend account's own address, so `ALERT_EMAIL` must be that address until a domain is verified. `TELEGRAM_CHAT_ID` is empty, so there is no working fallback.
 - An alert is recorded in `sent_alerts` only after delivery; `ALERT NOT DELIVERED` in the log means it retries next run.
 
@@ -187,7 +186,7 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 4. **Run deploy**: `pwsh C:\Users\user\watchtower\deploy.ps1`
 5. **Set env vars** on VPS: edit `~/watchtower/.env`
 
-### systemd service (optional)
+### systemd service (installed 2026-11-08)
 ```ini
 [Unit]
 Description=Watchtower
@@ -199,6 +198,7 @@ User=ubuntu
 WorkingDirectory=/home/ubuntu/watchtower/monitor
 ExecStart=/home/ubuntu/watchtower/monitor/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8080
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -213,6 +213,9 @@ sudo journalctl -u watchtower -f
 ---
 
 ## Changelog
+
+### 2026-11-08 — Watchtower moved to systemd
+- Replaced the April `nohup` process with enabled service `watchtower`, so it starts on boot and restarts after a crash. Verified with `kill -9`; a full VPS reboot was not tested.
 
 ### 2026-11-08 — Output checks and alert delivery (audit-2 E01)
 - Added 16 output probes for HSI, TakerLongShort, SmartFlow shadow, short-alpha, DevOps-Scanner and five Mac launchd jobs. See `docs/output-checks.md`.
