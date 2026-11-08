@@ -24,13 +24,12 @@
 
 ## Decisions / constraints
 
-- The uncommitted `CLAUDE.md` hunk contains a Resend key. It must not be committed; staged edits were built from HEAD.
 - The repo is public: no LAN address, employer asset name or secret. Mac settings stay in `RELAY_*` keys in local `.env`.
 - SmartFlow legacy cron is not probed. `mac-asset-radar` is excluded from AI diagnosis.
 
 ## Next handoff
 
-- The local checkout is synced with `origin/main`; the uncommitted `CLAUDE.md` hunk is still preserved. Deploy with `deploy.ps1`, which refuses a checkout that differs from `origin/main`. Its full deploy path has not been run yet.
+- The local checkout is clean and synced with `origin/main`; the old `CLAUDE.md` hunk containing a Resend key was discarded on owner approval (the key remains in both `.env` files). Deploy with `deploy.ps1`, which refuses a checkout that differs from `origin/main`. Its full deploy path has not been run yet.
 - After the 2026-11-14 reboot, confirm the service is active and no alert was re-sent; a full reboot is still untested.
 - Key counts for five jobs need writer changes in their own projects: see "Key counts not yet covered" in `docs/output-checks.md`.
 - AI diagnosis claims are unverified; each owning project's session should confirm before fixing.
