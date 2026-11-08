@@ -14,13 +14,11 @@ Self-hosted performance + availability monitoring for all projects. Probes HTTP 
 
 ```bash
 # Deploy to VPS
-pwsh C:\Users\user\watchtower\deploy.ps1
+pwsh C:\Users\User\monitor\deploy.ps1
 
 # Or SSH in and run manually
 ssh -i "C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem" ubuntu@18.139.210.59
-cd ~/watchtower
-source venv/bin/activate
-python -m uvicorn main:app --host 0.0.0.0 --port 8080
+sudo systemctl status watchtower
 ```
 
 **Dashboard**: http://18.139.210.59:8080/
@@ -174,7 +172,7 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 **AI diagnosis** (`relay/triage.py`): after each relay upload, up to 2 new alerts get a headless Claude Code run limited to `Read,Grep,Glob` in the job's project, with fixed read-only evidence. The Cantonese report is emailed to `RELAY_TRIAGE_EMAIL`. One run per alert occurrence (`%LOCALAPPDATA%\watchtower-relay\triaged.json`). `mac-asset-radar` is excluded because its logs may name employer assets. If the CLI is logged out, triage pauses and emails a reminder once a day; fix with `claude auth login`. Keep the empty `--setting-sources` in `triage.py`: without it the user-level allow list lets the agent read any path.
 
 **Gotchas**
-- `deploy.ps1` is stale: it uploads to `~/watchtower`, but the app runs from `~/watchtower/monitor`. Deploy with `scp` into `monitor/`.
+- `deploy.ps1` refuses to run unless local `HEAD` equals `origin/main` and the deployed files are clean, because other sessions deploy here too and a stale checkout would roll production back.
 - Watchtower runs as systemd service `watchtower` (enabled, `Restart=on-failure`, `RestartSec=60`, 5 starts per 10 min, matching the Taker units). Restart with `sudo systemctl restart watchtower`; logs are in `journalctl -u watchtower`, not `/tmp/watchtower.log`.
 - Resend's test sender only delivers to the Resend account's own address, so `ALERT_EMAIL` must be that address until a domain is verified. `TELEGRAM_CHAT_ID` is empty, so there is no working fallback.
 - An alert is recorded in `sent_alerts` only after delivery; `ALERT NOT DELIVERED` in the log means it retries next run.
@@ -186,7 +184,7 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 1. **SSH key**: `C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem`
 2. **Test SSH**: `ssh -i "C:\Users\user\PycharmProjects\CryptoStrategy\mcp_server\LightsailDefaultKey-ap-southeast-1.pem" ubuntu@18.139.210.59`
 3. **Python**: Python 3.10.12 already installed on VPS
-4. **Run deploy**: `pwsh C:\Users\user\watchtower\deploy.ps1`
+4. **Run deploy**: `pwsh C:\Users\User\monitor\deploy.ps1`
 5. **Set env vars** on VPS: edit `~/watchtower/.env`
 
 ### systemd service (installed 2026-11-08)
@@ -221,6 +219,9 @@ sudo journalctl -u watchtower -f
 ---
 
 ## Changelog
+
+### 2026-11-08 — deploy.ps1 rewritten
+- Targets `~/watchtower/monitor` and the systemd service, backs up first, and refuses a checkout that differs from `origin/main`. The refusal path was tested; a full deploy through the script was not.
 
 ### 2026-11-08 — Output-check tests and alert-once fixes (audit-2 E01)
 - Added `tests/test_output_checks.py`. A SmartFlow log failing at restart and a Windows task sampled while running now skip; both had caused a false `RECOVERED` and a repeat alert.
