@@ -2,7 +2,7 @@
 
 ## Current state
 
-- Branch / commit: `claude/e01-output-heartbeats-6f8fac`, based on `main` at `b5c8286`; production code at `d83f2b4` (not on `main` until this branch is merged).
+- Branch / commit: `main`; production code at `d83f2b4`.
 - Last agent: Claude
 - Updated: 2026-11-08 HKT
 
@@ -30,7 +30,7 @@
 
 ## Next handoff
 
-- Merge this branch to `main`. The main checkout has an uncommitted `CLAUDE.md` from another session, so preserve it when updating that checkout.
+- The local main checkout is behind `origin/main`: its uncommitted `CLAUDE.md` from another session blocks the fast-forward. Whoever owns that edit should commit or discard it (never commit the Resend key), then run `git pull --ff-only`. The relay is unaffected; these commits do not change `relay/`.
 - After the 2026-11-14 reboot, confirm the service is active and no alert was re-sent; a full reboot is still untested.
 - Key counts for five jobs need writer changes in their own projects: see "Key counts not yet covered" in `docs/output-checks.md`.
 - AI diagnosis claims are unverified; each owning project's session should confirm before fixing.
