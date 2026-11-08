@@ -72,7 +72,9 @@ OUTPUT_PROBES = [
     # Windows relay (relay/relay.py -> ~/watchtower/heartbeats/relay.json)
     _output("watchtower-relay", "relay_heartbeat", "Windows WatchtowerRelay task"),
     _output("short-alpha-lambda", "relay_lambda", "Lambda short-alpha-agent"),
-    _output("devops-scanner", "relay_win_task", "Windows task DevOpsScanner", task_name="DevOpsScanner"),
+    # Runs at each Windows logon, so the age limit is generous.
+    _output("devops-scanner", "relay_win_task", "Windows task DevOpsScanner",
+            task_name="DevOpsScanner", max_age_hours=14 * 24),
     # Runs twice a day Mon-Sat; 50 h spans Sunday.
     _output("winwin-autopost-gha", "relay_gha", "GitHub Actions exchange-website daily-rate-card.yml", max_age_hours=50),
     _launchd("mac-smartflow-research", "com.smartflow.research.daily", 26),

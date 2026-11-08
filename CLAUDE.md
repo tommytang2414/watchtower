@@ -50,7 +50,8 @@ Dashboard                        ──► All registered targets status
 | `main.py` | FastAPI app + APScheduler — probe dispatch, dashboard route |
 | `config.py` | All probe definitions — add/edit targets here |
 | `storage.py` | SQLite: metrics (checks table) + alert state (sent_alerts table) |
-| `alerter.py` | Telegram + Resend dispatch, 4-hour dedup suppression |
+| `alerter.py` | Resend email, with Telegram as fallback |
+| `tests/test_output_checks.py` | Output rules and alert lifecycle: `python -m unittest discover -s tests` (needs `requirements.txt`) |
 | `probes/http_probe.py` | HTTP/HTTPS GET with response time, content check, stale flag |
 | `probes/github_actions.py` | GitHub Actions workflow poller (PyGithub) |
 | `probes/log_parser.py` | Local log file scanner for failure keywords |
@@ -141,7 +142,7 @@ checks(id, probe_name, probe_type, up, response_time_ms, status_code,
 sent_alerts(id, probe_name, alert_type, sent_at, resolved_at)
 ```
 
-Alert fires once per `probe_name + alert_type`. Subsequent failures are suppressed for 4 hours. On recovery, a `RECOVERED` message fires and the dedup window resets.
+Alert fires once per `probe_name + alert_type` and stays suppressed until the probe recovers; there is no time-based repeat, so a known-bad job alerts once. On recovery, a `RECOVERED` message fires and the next failure alerts again.
 
 ---
 
@@ -164,7 +165,7 @@ Checks every 15 min that a job left the evidence of a good run. Rules: `probes/o
 | `smartflow-sec-form4`, `-form144`, `-congress-house`, `-sfc-short` | `~/SmartFlow-shadow/logs/*.log` | no successful JSON block in 2 h (SFC 26 h) |
 | `watchtower-relay` | relay JSON | relay older than 2 h, or a source unreachable |
 | `short-alpha-lambda` | relay: CloudWatch | 0 candidates in all scans for 14 days, no scans, or price check unavailable in 4 days |
-| `devops-scanner` | relay: Task Scheduler | last result not 0 |
+| `devops-scanner` | relay: Task Scheduler | last result not 0, or last run older than 14 days (the task runs at logon) |
 | `winwin-autopost-gha` | relay: `gh` latest completed run | conclusion not success/skipped, or older than 50 h (runs Mon-Sat) |
 | `mac-smartflow-research`, `mac-asset-radar`, `mac-vulnpulse`, `mac-hk-civic-newsroom`, `mac-meme-agent` | relay: launchd | exit not 0, stdout log stale, asset-radar run or provider coverage incomplete. `mac-meme-agent` ends 2026-11-13 08:00 HKT |
 

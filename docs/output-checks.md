@@ -33,6 +33,27 @@ check asks "did the job leave the evidence a good run leaves?" instead of
 | DevOps-Scanner | Windows task | Relay | `LastTaskResult` | != 0 |
 | Relay itself | Windows task | Pull (file) | `generated_at` in relay JSON | older than 2 h |
 
+### Heartbeat contract
+
+Every job is reduced to the same record, read from evidence it already leaves.
+A probe is healthy only if the record is fresh and in range.
+
+| Job | `finished_at` from | Status from | Key count and range | Max age |
+|---|---|---|---|---|
+| `hsi-shortsell` | syslog run start | `短倉` line present | stocks ≥ 47; close data date = today | 13:00 / 17:00 HKT deadline |
+| `taker-opt`, `taker-og` | journal `Running checks` | line present | none: alert loop | 2 h |
+| `taker-sheet` | journal `logged` | line present | the row is the output | 2 h |
+| `smartflow-*` shadow (4) | log mtime | last JSON block `status` | none enforced | 2 h; SFC 26 h |
+| `short-alpha-lambda` | `Full scan done` in 14 d | no `Price check unavailable` in 4 d | scans > 0 and max candidates > 0 | 14 d |
+| `mac-asset-radar` | stdout mtime; run date | `last_exit` 0; run complete | providers ok = ran | 26 h |
+| `mac-smartflow-research`, `mac-hk-civic-newsroom` | stdout mtime | `last_exit` 0 | none | 26 h |
+| `mac-vulnpulse` / `mac-meme-agent` | stdout mtime | `last_exit` 0; meme-agent running | none | 7 h / 2 h |
+| `devops-scanner` | Task Scheduler last run | last result 0 | none | 14 d (logon trigger) |
+| `winwin-autopost-gha` | latest completed run | conclusion success/skipped | none | 50 h |
+| `watchtower-relay` | `generated_at` | every section `ok` | none | 2 h |
+
+Jobs with "none" can still exit 0 and produce nothing; see "Key counts not yet covered".
+
 ### The relay (recommended)
 
 The Windows PC is the only machine that already reaches the Mac (pinned SSH key),
@@ -92,6 +113,12 @@ separate IAM approval).
   that writes, shell, web, `.env` and files outside the project are refused. The first
   three real diagnoses ran through the scheduled task and reached the inbox.
 
+- **Tests and alert-once fixes** (`tests/test_output_checks.py`, run with
+  `python -m unittest discover -s tests`): a failing `json_log` tail seen first after a
+  restart now returns `skip`, and a running Windows task returns `skip`. Both used to report
+  healthy, which sent a false `RECOVERED` and then a second alert. `devops-scanner` also has a
+  14-day age limit; the task runs at logon, so it has no fixed schedule to hold it to.
+
 ## Result of first deploy
 
 Four probes fired on the known silent failures, and Resend accepted all four emails:
@@ -103,10 +130,27 @@ Deploying also showed that no alert had ever been delivered: Resend's test sende
 rejected `ALERT_EMAIL` with 403, and `TELEGRAM_CHAT_ID` was empty. `ALERT_EMAIL` now
 holds the Resend account's address, and an alert is recorded only after delivery.
 
+## Key counts not yet covered
+
+These jobs are checked for exit status and freshness only, so a clean exit with empty
+output stays silent: `mac-smartflow-research`, `mac-vulnpulse`, `mac-hk-civic-newsroom`,
+`mac-meme-agent`, `devops-scanner`. Closing this needs a writer change in each project.
+After each run, atomically write this file beside the job's stdout log (DevOps-Scanner:
+beside its daily report):
+
+```json
+{"job": "<watchtower probe name>", "finished_at": 1794124474, "exit_status": 0, "key_count": 12}
+```
+
+`key_count` is the number of useful items that run produced (reports written, advisories
+matched, stories published, findings evaluated); each project's session picks the unit and
+its minimum. The relay read and range rule are added here once a job emits the file.
+
 ## Follow-ups for other projects
 
-No job needs a heartbeat line; every check reads output the job already writes.
-These are the fixes that will clear the alerts, each for that project's own session:
+No job needs a heartbeat line for the current alerts; every check reads output the job
+already writes. These are the fixes that will clear the alerts, each for that project's
+own session:
 
 | Project | Alert it clears | Change |
 |---|---|---|

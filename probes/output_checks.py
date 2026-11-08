@@ -23,6 +23,8 @@ RELAY_MAX_AGE_HOURS = 2
 _hk_holidays = holidays.HK()
 # Last time a json_log probe saw a successful tail, keyed by path (in-memory).
 _last_success: dict[str, float] = {}
+# Keys whose clock started at a restart, with no success seen since.
+_unconfirmed: set[str] = set()
 
 
 def _ok() -> dict:
@@ -163,13 +165,18 @@ def evaluate_json_log(tail: str, mtime: float, now: float, max_age_hours: float,
     tail_ok = bool(lines) and lines[-1] == "}" and bool(statuses) and statuses[-1] == "success"
     if tail_ok:
         _last_success[key] = mtime
-    else:
+        _unconfirmed.discard(key)
+    elif key not in _last_success:
         # First sight of a failing tail after a restart: start the clock now.
-        _last_success.setdefault(key, now)
+        _last_success[key] = now
+        _unconfirmed.add(key)
     age = _age_h(_last_success[key], now)
     if age > max_age_hours:
         last_state = statuses[-1] if statuses else "no status"
         return _bad([f"no successful run for {age:.1f} h (> {max_age_hours:g} h); last block: {last_state}"])
+    if key in _unconfirmed:
+        # Reporting up here would falsely resolve an alert opened before the restart.
+        return _skip("failing log tail, no success seen since restart")
     return _ok()
 
 
@@ -275,19 +282,34 @@ def evaluate_relay_lambda(data: dict | None, problem: str | None) -> dict:
     return _bad(reasons) if reasons else _ok()
 
 
-# Task Scheduler: 0x41301 = currently running.
-_TASK_OK = {0, 0x41301}
+# Task Scheduler result while the task is still running.
+_TASK_RUNNING = 0x41301
 
 
-def evaluate_relay_win_task(probe: dict, data: dict | None, problem: str | None) -> dict:
+def _task_epoch(last_run: str | None) -> float | None:
+    """schtasks 'Last Run Time' on the PC, for example '11/4/2026 7:46:54 AM' (HKT)."""
+    try:
+        return datetime.strptime(last_run or "", "%m/%d/%Y %I:%M:%S %p").replace(tzinfo=HKT).timestamp()
+    except ValueError:
+        return None
+
+
+def evaluate_relay_win_task(probe: dict, data: dict | None, problem: str | None, now: float) -> dict:
     win, skip = _relay_section(data, problem, "windows")
     if skip:
         return skip
     task = win.get("tasks", {}).get(probe["task_name"])
     if not task:
         return _bad(["scheduled task not found"])
-    if task.get("last_result") not in _TASK_OK:
+    if task.get("last_result") == _TASK_RUNNING:
+        return _skip("task is running; no finished result to judge")
+    if task.get("last_result") != 0:
         return _bad([f"last result {task.get('last_result')} (last run {task.get('last_run')})"])
+    age = _age_h(_task_epoch(task.get("last_run")), now)
+    if age is None:
+        return _bad([f"last run time unreadable: {task.get('last_run')}"])
+    if age > probe["max_age_hours"]:
+        return _bad([f"last run {age:.0f} h ago (> {probe['max_age_hours']:g} h)"])
     return _ok()
 
 
@@ -317,7 +339,7 @@ def check_relay(probe: dict) -> dict:
     if kind == "relay_lambda":
         return evaluate_relay_lambda(data, problem)
     if kind == "relay_win_task":
-        return evaluate_relay_win_task(probe, data, problem)
+        return evaluate_relay_win_task(probe, data, problem, time.time())
     if kind == "relay_gha":
         return evaluate_relay_gha(probe, data, problem, time.time())
     raise ValueError(f"unknown relay check {kind}")
